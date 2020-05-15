@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # In[2]:
 
 
-d=100 #resolution du scan en nanomètre
+d=99 #resolution du scan en nanomètre
 npx=25 # nombre de pixel du scan
 picture=np.zeros([npx,npx]) # fonction numpy qui initie un array de taille npx² avec des zeros
 sigma=250 # largeur caractéristique de la gaussienne
@@ -41,7 +41,7 @@ plt.show()'''
 
 
 '''_________On ajoute les images des particules au tableau________'''
-tailleimage=6*int(sigma/d) # sigma/d correspond converti l'ecart des gaussiennes en pixel. tailleimage est le nombre de pixel que l'on utilise pour simuler une mage
+tailleimage=12*int(sigma/d) # sigma/d correspond converti l'ecart des gaussiennes en pixel. tailleimage est le nombre de pixel que l'on utilise pour simuler une mage
 picture=np.zeros([npx,npx]) # on reinitialise le tableau
 for i in picture : # bruit de fond
     i=np.random.normal(60,np.sqrt(60)) #60 est l'intensité moyenne du bruit de fond
