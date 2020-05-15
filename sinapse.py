@@ -45,7 +45,7 @@ def capture():
         grabResult.Release()
     return(img)
 
-#____________________DMD______________________________________________________________
+#____________________DMD_____________________________________________________________
 
 def afficher(img,DMD):
     # on prépare la mémoire sur la ram du DMD pour n tableau de bits
