@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # In[2]:
 
 
-d=100 #resolution du scan en nanomètre
+d=101 #resolution du scan en nanomètre
 npx=25 # nombre de pixel du scan
 picture=np.zeros([npx,npx]) # fonction numpy qui initie un array de taille npx² avec des zeros
 sigma=250 # largeur caractéristique de la gaussienne
