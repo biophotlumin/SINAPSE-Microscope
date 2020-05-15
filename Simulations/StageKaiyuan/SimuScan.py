@@ -11,11 +11,11 @@ import matplotlib.pyplot as plt
 # In[2]:
 
 
-d=300 #resolution du scan en nanomètre
-npx=100 # nombre de pixel du scan
+d=100 #resolution du scan en nanomètre
+npx=25 # nombre de pixel du scan
 picture=np.zeros([npx,npx]) # fonction numpy qui initie un array de taille npx² avec des zeros
 sigma=300 # largeur caractéristique de la gaussienne
-nbspot=50 # nombe de particules dans le champs simulé
+nbspot=1 # nombe de particules dans le champs simulé
 '''___un petit morceau de code pour comprendre ce que signifie les indieces en numpy array_____'''
 picturei=np.zeros([npx,npx]) # pour voir quelle direction est influée par u ne modification du premierindice du tableau
 for i in range(100):
@@ -41,10 +41,10 @@ plt.show()
 
 '''_________On ajoute les images des particules au tableau________'''
 tailleimage=12*int(sigma/d) # sigma/d correspond converti l'ecart des gaussiennes en pixel. tailleimage est le nombre de pixel que l'on utilise pour simuler une mage
-picture=np.zeros([npx,npx]) # on reinitialise le tableau  
-for i in picture : # bruit de fond 
+picture=np.zeros([npx,npx]) # on reinitialise le tableau
+for i in picture : # bruit de fond
     i=np.random.normal(60,np.sqrt(60)) #60 est l'intensité moyenne du bruit de fond
-    
+
 for n in range (nbspot): #boucle for qui va ajouter chaque image de particules
     In=np.random.normal(500,200) # on tire aléatoirement l'intensité et la position des particules
     xn=np.random.randint(0,npx-6)
@@ -62,7 +62,3 @@ plt.show()
 
 
 # In[ ]:
-
-
-
-
