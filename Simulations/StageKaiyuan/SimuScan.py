@@ -16,6 +16,7 @@ npx=25 # nombre de pixel du scan
 picture=np.zeros([npx,npx]) # fonction numpy qui initie un array de taille npx² avec des zeros
 sigma=250 # largeur caractéristique de la gaussienne
 nbspot=1 # nombe de particules dans le champs simulé
+#juste un test pour tester le double remote
 '''___un petit morceau de code pour comprendre ce que signifie les indieces en numpy array_____'''
 '''picturei=np.zeros([npx,npx]) # pour voir quelle direction est influée par u ne modification du premierindice du tableau
 for i in range(npx):
