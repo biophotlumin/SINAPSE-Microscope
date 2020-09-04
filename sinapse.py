@@ -1,13 +1,15 @@
 """ Module_microscope_SINAPSE Florian Semmer """
 import ALPlib
-from numpy import *
+import numpy as np
 import imageio
 from pylab import *
 from time import time
 from nifpga import Session
 from pypylon import pylon
 from pypylon import genicam
-
+from ctypes import *
+from numba import jit
+import time
 
 
 #_________________________CameraBasler________________________________________________
@@ -20,8 +22,6 @@ def capture():
 
     #.On cree un objet camera attaché à la première caméra trouvée
     camera = pylon.InstantCamera(pylon.TlFactory.GetInstance().CreateFirstDevice())
-    # on affiche le modèle de la caméra.
-    print("Using device ", camera.GetDeviceInfo().GetModelName())
 
     # noombre de buffers autorisé pour la capture d'images
     camera.MaxNumBuffer = 5
@@ -39,55 +39,73 @@ def capture():
             print("SizeX: ", grabResult.Width)
             print("SizeY: ", grabResult.Height)
             img = grabResult.Array
-            print("Gray value of first pixel: ", img[xmax, ymax])
         else:
             print("Error: ", grabResult.ErrorCode, grabResult.ErrorDescription)
         grabResult.Release()
     return(img)
 
-#____________________DMD_____________________________________________________________
+#____________________DMD______________________________________________________________
 
-def afficher(img,DMD):
+def afficher(img,DMD,it):
+    '''
+    fonction permettant l'affichage sur le DMD d'une image unique.
+    Nécessite d'avoir déclarer l'objet DMD au préalable
+    img = numpy array
+    it = illumination time en microsecondes
+    DMD = nom de l'objet DMD precedemment innitalisé
+    '''
     # on prépare la mémoire sur la ram du DMD pour n tableau de bits
     DMD.SeqAlloc(nbImg = 1, bitDepth = 1)
-    # envoyer la séquence à afficher sur la RAM
+    # envoyer la séquence à afficher sur la RAM. ravel transforme tableau 2D en tableau 1D
     DMD.SeqPut(imgData = img.ravel())
     # parametrer l'affichage de la dernière séquence chargée
-    DMD.SetTiming(illuminationTime = 1000000)
+    DMD.SetTiming(illuminationTime = it)
     # afficher la séquence dans une boucle infinie
     DMD.Run()
     return()
 
-def Holo_Position(x_ech,y_ech,z_ech,correction_filepath):
-    '''x, y et z sont les 3 coordonnées (micromètre) du point de focalisation du laser. La fonction renvoie alors un tableau de uint8 étant l'hologramme à afficher'''
+def Holo_Position(x_ech,y_ech,z_ech,correction_filepath,T_porteuse,q,wavelentgh):
+    '''
+    x, y et z :  les 3 coordonnées (micromètre) du point de focalisation du laser. La fonction renvoie alors un tableau de uint8 étant l'hologramme à afficher
+    correction_filepath : le chemin vers un masque de phase de dimension 768*1024
+    T_porteuse :  la periode correspondant à la position centrale du champs en metre
+    q :  est un genre de facteur de remplissage. égal à un si 50% des pixels sont noirs.
+         attention, si q=1, les zéros du facteur de forme sont confondus avec l'ordre deux.
+         Alors lorsque l'on utilise laser 515 q doit être différent de 1
+    wavelentgh : longueure d'onde en metre du laser utilisé
+    : return : np array
+    '''
 
-    wavelentgh =0.514e-6 #Longueure d'onde en METRE
+
+    #wavelentgh =0.514e-6 #Longueure d'onde en METRE
     d=13.6e-6 #Taille d'un coté des micromirroir en METRE
-    theta=12*pi/180 # Angle que fait le vecteur d'onde de l'onde de reference avec l'axe z, normal au plan moyen du dmd.
-    rho=45*pi/180
+    theta=12*np.pi/180 # Angle que fait le vecteur d'onde de l'onde de reference avec l'axe z, normal au plan moyen du dmd.
+    rho=45*np.pi/180
     r=1
     #_________déterminons phi, l'angle de la rotation qui relie R à Ro_____________________
-    s=1/sqrt(2)
-    cp=sqrt(cos(theta)**2-sin(theta)*r*wavelentgh*cos(rho)/(2*d)-(r*wavelentgh/(4*d))**2) #cp=cos(phi)
-    pc=arccos(cp)*180/pi #pc=phi juste pour avoir une idée de sa valeur
-    sp=sqrt(sin(theta)**2+sin(theta)*r*wavelentgh*cos(rho)/(2*d)+(r*wavelentgh/(4*d))**2)
-    ps=arcsin(sp)*180/pi
-    phi=arctan(sp/cp)*180/pi
-    nx=(-r*wavelentgh/(4*d)-sin(theta)*cos(rho))/sp
-    ny=(sin(theta)*sin(rho))/sp
+    s=1/np.sqrt(2)
+    cp=np.sqrt(np.cos(theta)**2-np.sin(theta)*r*wavelentgh*np.cos(rho)/(T_porteuse/2)-(r*wavelentgh/(T_porteuse))**2) #cp=cos(phi)
+    pc=np.arccos(cp)*180/np.pi #pc=phi juste pour avoir une idée de sa valeur
+    sp=np.sqrt(np.sin(theta)**2+np.sin(theta)*r*wavelentgh*np.cos(rho)/(T_porteuse)+(r*wavelentgh/(T_porteuse))**2)
+    ps=np.arcsin(sp)*180/np.pi
+    phi=np.arctan(sp/cp)*180/np.pi
+    nx=(-r*wavelentgh/(T_porteuse)-np.sin(theta)*np.cos(rho))/sp
+    ny=(np.sin(theta)*np.sin(rho))/sp
     nz=0
 
-    n=array([ [nx],  [ny], [nz] ]) # vecteur dirigeant l'axe de la rotation pour passer du repèreDMD à repère AxeOptique
-    I=array([ [1,0,0],[0,1,0], [0,0,1] ])
-    R1=array([[nx**2, nx*ny, nx*nz], [ny*nx, ny**2, ny*nz],[nz*nx, ny*nz, nz**2] ])
-    R2=array([ [0, -nz, ny], [ nz, 0, -nx],[-ny, nx, 0] ])
+    n=np.array([ [nx],  [ny], [nz] ]) # vecteur dirigeant l'axe de la rotation pour passer du repèreDMD à repère AxeOptique
+    I=np.array([ [1,0,0],[0,1,0], [0,0,1] ])
+    R1=np.array([[nx**2, nx*ny, nx*nz], [ny*nx, ny**2, ny*nz],[nz*nx, ny*nz, nz**2] ])
+    R2=np.array([ [0, -nz, ny], [ nz, 0, -nx],[-ny, nx, 0] ])
 
     Npx,Npy=768,1024 #Nombre de pixels sur le DMD
-    dmd=zeros((Npx,Npy))
+    dmd=np.zeros((Npx,Npy))
     i0,j0=Npx/2,Npy/2 #Indice du pixel central
     f1,f2,fobj=0.5,0.3,-0.00333 #focales en METRE des lentilles resp. L1,L2,Objectif
     F=f1*fobj/f2
     neau=1.33
+
+
     #_________________________________________________________________________________
     xe=x_ech*1e-6
     ye=y_ech*1e-6
@@ -115,32 +133,43 @@ def Holo_Position(x_ech,y_ech,z_ech,correction_filepath):
     yco=y1*(-f1+zco)/(f1+z1)
     #_______________passage du repère AxeOptique vers DMD____________________________
 
-    Co=array([[xco],[yco],[zco]])
+    Co=np.array([[xco],[yco],[zco]])
     R=I*cp+(1-cp)*R1+sp*R2
-    C=dot(R,Co)
+    C=np.dot(R,Co)
     #______________Determination de l'interferogramme sur le DMD_____________________
-    sr=sin(theta)*sin(rho)
-    cr=sin(theta)*sin(rho)
+    sr=np.sin(theta)*np.sin(rho)
+    cr=np.sin(theta)*np.sin(rho)
     # Fonction génératrice numpy
     phi=np.load(correction_filepath)
     def f(i, j):
         x=(i+1/2-i0)*d
         y=(j+1/2-j0)*d
-        return ((1+cos((2*pi/wavelentgh)*(sqrt((C[0][0]-x)**2+(C[1][0]-y)**2+C[2][0]**2)-sr*x-cr*y)-phi[i,j]))>1)
+        return ((1+np.cos((2*np.pi/wavelentgh)*(np.sqrt((C[0][0]-x)**2+(C[1][0]-y)**2+C[2][0]**2)-sr*x-cr*y)-phi[i,j]))>q)
         #return ((1+cos((2*pi/wavelentgh)*(sqrt((C[0][0]-x)**2+(C[1][0]-y)**2+C[2][0]**2)-sr*x-cr*y)))>1)
 
     # Génération parallélisée de l'array avec np.fromfunction et la fonction génératrice :)
     #filepath = "C:\\Users\\lac\\Desktop\\Florian\\Alignement\\"
     #file_name = filepath+str(m)+".npy"
+
+
     dmd=where(fromfunction(f, (Npx, Npy), dtype=int),0,255)
 
     #dmd=where(fromfunction(f, (Npx, Npy), dtype=uint8),0x00,0x80)
     #dmd=fromfunction(f, (Npx, Npy), dtype=uint8)
     return(dmd)
 
+def Sequence_load(sequence_path,ntot):
+    '''
+    sequence_path est le chemin vers le .txt contenant la sequence
+    ntot est le nombre total de valeur à charger 768*1024*nseq ou nseq est le nombre d'holo dans la seq
+    '''
+    a = (c_ubyte *ntot)()
+    i=0
+    for line in open(sequence_path):
+        a[i]=int(line)
+        i+=1
+    return(a)
 
-def Phase_correction():
-    return()
 
 def Raster_Scan(Xpix,Ypix,xinit,yinit,zinit,pictime,dx,dy):
     pici=zeros((Xpix,Ypix))
